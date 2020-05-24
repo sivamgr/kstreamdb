@@ -1,7 +1,6 @@
 package kstreamdb
 
 import (
-	"io/ioutil"
 	"os"
 	"testing"
 	"time"
@@ -14,9 +13,7 @@ var outTicks []TickData
 
 // TestDB method to test the db
 func TestDB(t *testing.T) {
-	dir, _ := ioutil.TempDir("", "kstreamdbtest")
-	os.MkdirAll(dir, 0755)
-	db := ConfigureDB(dir)
+	db := SetupDatabase("")
 	t1 := TickData{
 		TradingSymbol: "TestSym",
 		IsTradable:    true,
@@ -87,8 +84,8 @@ func TestDB(t *testing.T) {
 	if !cmp.Equal(inTicks, outTicks) {
 		t.Error("DB Insert and Playback Failed")
 	} else {
-		t.Log("DB success")
+		t.Log("Insert/Playback is successful")
 	}
 
-	//os.RemoveAll(dir)
+	os.RemoveAll(db.DataPath)
 }

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"compress/zlib"
 	"io"
+	"io/ioutil"
 	"os"
 	"path"
 	"path/filepath"
@@ -78,20 +79,43 @@ func createDirForFile(filepath string) {
 func writeMsgpack(filePath string, object interface{}) error {
 	file, err := os.Create(filePath)
 	if err == nil {
-		b, err := msgpack.Marshal(object)
-		if err != nil {
-			file.Close()
-			return err
+		b, err := encodeTicks(object)
+		if err == nil {
+			file.Write(b)
 		}
-
-		var zb bytes.Buffer
-		zw := zlib.NewWriter(&zb)
-		zw.Write(b)
-		zw.Close()
-		file.Write(zb.Bytes())
 		file.Close()
 	}
 	return err
+}
+
+func encodeTicks(object interface{}) ([]byte, error) {
+	b, err := msgpack.Marshal(object)
+	if err != nil {
+		return nil, err
+	}
+
+	var zb bytes.Buffer
+	zw := zlib.NewWriter(&zb)
+	zw.Write(b)
+	zw.Close()
+	return zb.Bytes(), nil
+}
+
+func decodeTicks(b io.Reader, object interface{}) error {
+	reader, err := zlib.NewReader(b)
+	if err != nil {
+		return err
+	}
+	var out bytes.Buffer
+	io.Copy(&out, reader)
+	reader.Close()
+	return msgpack.Unmarshal(out.Bytes(), object)
+}
+
+func decodeTicksFromBytes(b []byte, object interface{}) error {
+	reader := bytes.NewReader(b)
+	return decodeTicks(reader, object)
+
 }
 
 func readMsgpack(filePath string, object interface{}) error {
@@ -99,22 +123,20 @@ func readMsgpack(filePath string, object interface{}) error {
 	if err != nil {
 		return err
 	}
-	var out bytes.Buffer
-	reader, err := zlib.NewReader(file)
-	if err != nil {
-		return err
-	}
-	io.Copy(&out, reader)
-	reader.Close()
+	err = decodeTicks(file, object)
 	file.Close()
-	return msgpack.Unmarshal(out.Bytes(), object)
+	return err
 }
 
-// ConfigureDB func
-func ConfigureDB(DataPath string) DB {
-	return DB{DataPath: DataPath}
+// SetupDatabase func
+func SetupDatabase(DataPath string) DB {
+	if DataPath == "" {
+		DataPath, _ = ioutil.TempDir("", "kstreamdb")
+		os.MkdirAll(DataPath, 0755)
+	}
+	db := DB{DataPath: DataPath}
+	return db
 }
-
 func (r *DB) generateTickFilePath(dt time.Time) string {
 	filePath := path.Join(r.DataPath, dt.Format("2006/01/02/15/04/05"))
 	createDirForFile(filePath)
