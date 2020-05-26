@@ -10,12 +10,13 @@ func (r *DB) RecordStream(s *Socket) {
 func (r *DB) doRecordingStream(s *Socket) {
 	que := newTickQueue(200)
 	ch := s.SubscribeTicks()
+	ticker := time.NewTicker(1 * time.Second)
 	for {
 		select {
 		case msg := <-ch:
 			t := msg.(TickData)
 			que.put(t)
-		case <-time.After(1 * time.Second):
+		case <-ticker.C:
 			if !que.isEmpty() {
 				r.Insert(que.q[0:que.len])
 				que.clear()
