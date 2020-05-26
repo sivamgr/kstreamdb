@@ -3,12 +3,12 @@ package kstreamdb
 import (
 	"bytes"
 	"compress/zlib"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"os"
 	"path"
 	"path/filepath"
-	"strconv"
 	"time"
 
 	msgpack "github.com/vmihailenco/msgpack/v4"
@@ -76,10 +76,10 @@ func createDirForFile(filepath string) {
 	}
 }
 
-func writeMsgpack(filePath string, object interface{}) error {
+func writeMsgpackFile(filePath string, object interface{}) error {
 	file, err := os.Create(filePath)
 	if err == nil {
-		b, err := encodeTicks(object)
+		b, err := encodeTicks(object, true)
 		if err == nil {
 			file.Write(b)
 		}
@@ -88,42 +88,48 @@ func writeMsgpack(filePath string, object interface{}) error {
 	return err
 }
 
-func encodeTicks(object interface{}) ([]byte, error) {
+func encodeTicks(object interface{}, bCompress bool) ([]byte, error) {
 	b, err := msgpack.Marshal(object)
 	if err != nil {
 		return nil, err
 	}
-
-	var zb bytes.Buffer
-	zw := zlib.NewWriter(&zb)
-	zw.Write(b)
-	zw.Close()
-	return zb.Bytes(), nil
+	if bCompress {
+		var zb bytes.Buffer
+		zw := zlib.NewWriter(&zb)
+		zw.Write(b)
+		zw.Close()
+		return zb.Bytes(), nil
+	}
+	return b, nil
 }
 
-func decodeTicks(b io.Reader, object interface{}) error {
-	reader, err := zlib.NewReader(b)
-	if err != nil {
-		return err
-	}
+func decodeTicks(b io.Reader, object interface{}, bCompress bool) error {
 	var out bytes.Buffer
-	io.Copy(&out, reader)
-	reader.Close()
+	if bCompress {
+		reader, err := zlib.NewReader(b)
+		if err != nil {
+			return err
+		}
+		io.Copy(&out, reader)
+		reader.Close()
+	} else {
+		io.Copy(&out, b)
+	}
 	return msgpack.Unmarshal(out.Bytes(), object)
 }
 
-func decodeTicksFromBytes(b []byte, object interface{}) error {
+func decodeTicksFromBytes(b []byte, object interface{}, bCompress bool) error {
 	reader := bytes.NewReader(b)
-	return decodeTicks(reader, object)
+	return decodeTicks(reader, object, bCompress)
 
 }
 
-func readMsgpack(filePath string, object interface{}) error {
+func readMsgpackFile(filePath string, object interface{}) error {
 	file, err := os.Open(filePath)
 	if err != nil {
 		return err
 	}
-	err = decodeTicks(file, object)
+	err = decodeTicks(file, object, true)
 	file.Close()
 	return err
 }
@@ -140,14 +146,9 @@ func SetupDatabase(DataPath string) DB {
 func (r *DB) generateTickFilePath(dt time.Time) string {
 	filePath := path.Join(r.DataPath, dt.Format("2006/01/02/15/04/05"))
 	createDirForFile(filePath)
-	const ext = ".mpz"
 	suffixID := int64(0)
 	for {
-		fpath := filePath
-		if suffixID > 0 {
-			fpath += "_" + strconv.FormatInt(suffixID, 10)
-		}
-		fpath += ext
+		fpath := filePath + fmt.Sprintf("_%03d", suffixID) + ".mpz"
 		if fileExists(fpath) {
 			suffixID++
 			continue
@@ -163,12 +164,12 @@ func (r *DB) Insert(ticks []TickData) error {
 	}
 
 	fpath := r.generateTickFilePath(ticks[0].Timestamp)
-	writeMsgpack(fpath, ticks)
+	writeMsgpackFile(fpath, ticks)
 	return nil
 }
 
 //PlaybackFunc callback
-type PlaybackFunc func([]TickData)
+type PlaybackFunc func(TickData)
 
 func playbackFolder(dpath string, fn PlaybackFunc) error {
 	var w filepath.WalkFunc
@@ -177,8 +178,10 @@ func playbackFolder(dpath string, fn PlaybackFunc) error {
 			return err
 		}
 		ticks := new([]TickData)
-		readMsgpack(path, ticks)
-		fn(*ticks)
+		readMsgpackFile(path, ticks)
+		for _, t := range *ticks {
+			fn(t)
+		}
 		return nil
 	}
 

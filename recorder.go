@@ -8,18 +8,25 @@ func (r *DB) RecordStream(s *Socket) {
 }
 
 func (r *DB) doRecordingStream(s *Socket) {
+	que := newTickQueue(200)
+	ch := s.SubscribeTicks()
 	for {
-		ch := s.SubscribeTicks()
-		for {
-			if msg, ok := <-ch; ok {
-				t := msg.([]TickData)
-				r.Insert(t)
-			} else {
-				// Channel Closed
-				break
+		select {
+		case msg := <-ch:
+			t := msg.(TickData)
+			que.put(t)
+		case <-time.After(1 * time.Second):
+			if !que.isEmpty() {
+				r.Insert(que.q[0:que.len])
+				que.clear()
 			}
 		}
-		// Retry connection after 10 seconds
-		time.Sleep(10 * time.Second)
+	}
+}
+
+func (q *tickQueue) writeQueueToDb(db *DB) {
+	if q.len > 0 {
+		db.Insert(q.q[0:q.len])
+		q.len = 0
 	}
 }

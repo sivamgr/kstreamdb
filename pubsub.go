@@ -64,20 +64,20 @@ func (s *Socket) handleStream() {
 		if err != nil {
 			break
 		}
-		ticks := make([]TickData, 0)
-		err = decodeTicksFromBytes(msg, ticks)
-		s.InProcPubSub.Pub(ticks, "tick")
+		var tick TickData
+		err = decodeTicksFromBytes(msg, tick, false)
+		s.InProcPubSub.Pub(tick, "tick")
 	}
 }
 
-// Publish publishes all ticks to channels
-func (s *Socket) Publish(ticks []TickData) error {
+// Publish publishes tick to channels
+func (s *Socket) Publish(tick TickData) error {
 	if s.InProcPubSub != nil {
-		s.InProcPubSub.Pub(ticks, "tick")
+		s.InProcPubSub.Pub(tick, "tick")
 	}
 
 	if s.IsStreamServer {
-		b, err := encodeTicks(ticks)
+		b, err := encodeTicks(tick, false)
 		if err == nil {
 			return s.Sock.Send(b)
 		}

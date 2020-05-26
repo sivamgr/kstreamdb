@@ -77,8 +77,8 @@ func TestDB(t *testing.T) {
 	//t.Logf("Inserting, %+v", inTicks)
 
 	db.Insert(inTicks)
-	db.PlaybackAll(func(t []TickData) {
-		outTicks = append(outTicks, t...)
+	db.PlaybackAll(func(t TickData) {
+		outTicks = append(outTicks, t)
 	})
 	//t.Logf("Readback, %+v", outTicks)
 	if !cmp.Equal(inTicks, outTicks) {
