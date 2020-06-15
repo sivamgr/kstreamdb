@@ -19,7 +19,7 @@ func (q *tickQueue) isFull() bool {
 }
 
 func (q *tickQueue) isEmpty() bool {
-	return (q.len >= q.capacity)
+	return (q.len <= 0)
 }
 
 func (q *tickQueue) clear() {

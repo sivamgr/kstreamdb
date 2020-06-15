@@ -16,18 +16,18 @@ func (r *DB) doRecordingStream(s *Socket) {
 		case msg := <-ch:
 			t := msg.(TickData)
 			que.put(t)
-		case <-ticker.C:
-			if !que.isEmpty() {
-				r.Insert(que.q[0:que.len])
-				que.clear()
+			if que.isFull() {
+				que.writeQueueToDb(r)
 			}
+		case <-ticker.C:
+			que.writeQueueToDb(r)
 		}
 	}
 }
 
 func (q *tickQueue) writeQueueToDb(db *DB) {
-	if q.len > 0 {
+	if !q.isEmpty() {
 		db.Insert(q.q[0:q.len])
-		q.len = 0
+		q.clear()
 	}
 }
