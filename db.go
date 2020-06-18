@@ -144,7 +144,7 @@ func SetupDatabase(DataPath string) DB {
 	return db
 }
 func (r *DB) generateTickFilePath(dt time.Time) string {
-	filePath := path.Join(r.DataPath, dt.Format("2006/01/02/15/04/05"))
+	filePath := path.Join(r.DataPath, dt.Format("20060102/150405"))
 	createDirForFile(filePath)
 	suffixID := int64(0)
 	for {
@@ -190,7 +190,7 @@ func playbackFolder(dpath string, fn PlaybackFunc) error {
 
 // PlaybackDate ticks from the date
 func (r *DB) PlaybackDate(dt time.Time, fn PlaybackFunc) error {
-	dayPath := path.Join(r.DataPath, dt.Format("2006/01/02"))
+	dayPath := path.Join(r.DataPath, dt.Format("20060102"))
 	return playbackFolder(dayPath, fn)
 }
 
