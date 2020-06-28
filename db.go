@@ -169,7 +169,7 @@ func (r *DB) Insert(ticks []TickData) error {
 }
 
 //GetDates returns dates
-func (r *DB) GetDates(dpath string) ([]time.Time, error) {
+func (r *DB) GetDates() ([]time.Time, error) {
 	dates := make([]time.Time, 0)
 	files, err := ioutil.ReadDir(r.DataPath)
 	if err == nil {
