@@ -222,7 +222,7 @@ func loadDataFromFolder(dpath string) ([]TickData, error) {
 }
 
 // LoadDataForDate loads ticks from the date
-func (r *DB) LoadDataForDate(dt time.Time, fn PlaybackFunc) ([]TickData, error) {
+func (r *DB) LoadDataForDate(dt time.Time) ([]TickData, error) {
 	dayPath := path.Join(r.DataPath, dt.Format("20060102"))
 	return loadDataFromFolder(dayPath)
 }
