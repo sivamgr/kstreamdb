@@ -188,6 +188,33 @@ func playbackFolder(dpath string, fn PlaybackFunc) error {
 	return filepath.Walk(dpath, w)
 }
 
+func loadDataFromFolder(dpath string) ([]TickData, error) {
+	data := make([]TickData, 0)
+	var w filepath.WalkFunc
+	w = func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		ticks := new([]TickData)
+		readMsgpackFile(path, ticks)
+		data = append(data, *ticks...)
+		return nil
+	}
+	err := filepath.Walk(dpath, w)
+	return data, err
+}
+
+// LoadDataForDate loads ticks from the date
+func (r *DB) LoadDataForDate(dt time.Time, fn PlaybackFunc) ([]TickData, error) {
+	dayPath := path.Join(r.DataPath, dt.Format("20060102"))
+	return loadDataFromFolder(dayPath)
+}
+
+// LoadAllData loads all ticks from db
+func (r *DB) LoadAllData() ([]TickData, error) {
+	return loadDataFromFolder(r.DataPath)
+}
+
 // PlaybackDate ticks from the date
 func (r *DB) PlaybackDate(dt time.Time, fn PlaybackFunc) error {
 	dayPath := path.Join(r.DataPath, dt.Format("20060102"))

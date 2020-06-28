@@ -80,11 +80,20 @@ func TestDB(t *testing.T) {
 	db.PlaybackAll(func(t TickData) {
 		outTicks = append(outTicks, t)
 	})
+
 	//t.Logf("Readback, %+v", outTicks)
 	if !cmp.Equal(inTicks, outTicks) {
 		t.Error("DB Insert and Playback Failed")
 	} else {
 		t.Log("Insert/Playback is successful")
+	}
+
+	outAllTicks, err := db.LoadAllData()
+
+	if (err != nil) || !cmp.Equal(inTicks, outAllTicks) {
+		t.Error("DB Load Failed")
+	} else {
+		t.Log("Load is successful")
 	}
 
 	os.RemoveAll(db.DataPath)
