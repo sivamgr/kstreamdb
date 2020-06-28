@@ -168,6 +168,23 @@ func (r *DB) Insert(ticks []TickData) error {
 	return nil
 }
 
+//GetDates returns dates
+func (r *DB) GetDates(dpath string) ([]time.Time, error) {
+	dates := make([]time.Time, 0)
+	files, err := ioutil.ReadDir(r.DataPath)
+	if err == nil {
+		for _, f := range files {
+			if f.IsDir() {
+				dt, err := time.Parse("20060102", f.Name())
+				if err == nil {
+					dates = append(dates, dt)
+				}
+			}
+		}
+	}
+	return dates, nil
+}
+
 //PlaybackFunc callback
 type PlaybackFunc func(TickData)
 
