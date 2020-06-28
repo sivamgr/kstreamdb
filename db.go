@@ -207,32 +207,27 @@ func playbackFolder(dpath string, fn PlaybackFunc) error {
 	return filepath.Walk(dpath, w)
 }
 
-/*
 func loadDataFromFolder(dpath string) ([]TickData, error) {
 	data := make([]TickData, 0)
-	var w filepath.WalkFunc
-	w = func(path string, info os.FileInfo, err error) error {
+	files := make([]string, 0)
+	
+	err := filepath.Walk(dpath, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}
-		ticks := new([]TickData)
-		readMsgpackFile(path, ticks)
-		data = append(data, *ticks...)
+		if(!info.IsDir()) {
+			files = append(files, path)
+		}
 		return nil
-	}
-	err := filepath.Walk(dpath, w)
-	return data, err
-}
-*/
-func loadDataFromFolder(dpath string) ([]TickData, error) {
-	data := make([]TickData, 0)
-	var w filepath.WalkFunc
-	jobs := make(chan string, 100)
-	results := make(chan int, 100)
+	})
+
+	maxworkers := runtime.NumCPU()
+	jobs := make(chan string, maxworkers)
+	results := make(chan int, 1)
 	mapData := make(map[string]*[]TickData)
 	mutex := &sync.Mutex{}
-
-	for w := 0; w < runtime.NumCPU(); w++ {
+	
+	for w := 0; w < maxworkers ; w++ {
 		go func(fpath <-chan string, result chan<- int) {
 			for fp := range fpath {
 				ticks := new([]TickData)
@@ -247,27 +242,25 @@ func loadDataFromFolder(dpath string) ([]TickData, error) {
 		}(jobs, results)
 	}
 
-	files := make([]string, 0)
-	w = func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			return err
+	i := 0
+	processed := 0
+	for ;processed < len(files); {
+		if(i < len(files)) && (len(jobs) < cap(jobs)) {
+			jobs <- files[i]
+			i++
+			continue
 		}
-		files = append(files, path)
-		jobs <- path
-		return nil
-	}
-	err := filepath.Walk(dpath, w)
-	close(jobs)
-	for a := 0; a < len(files); a++ {
 		<-results
+		processed++
 	}
+
+	close(jobs)
 
 	for _, fp := range files {
 		if val, ok := mapData[fp]; ok {
 			data = append(data, *val...)
 		}
 	}
-
 	return data, err
 }
 
