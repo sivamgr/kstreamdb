@@ -9,6 +9,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"runtime"
 	"time"
 
 	msgpack "github.com/vmihailenco/msgpack/v4"
@@ -205,6 +206,7 @@ func playbackFolder(dpath string, fn PlaybackFunc) error {
 	return filepath.Walk(dpath, w)
 }
 
+/*
 func loadDataFromFolder(dpath string) ([]TickData, error) {
 	data := make([]TickData, 0)
 	var w filepath.WalkFunc
@@ -218,6 +220,50 @@ func loadDataFromFolder(dpath string) ([]TickData, error) {
 		return nil
 	}
 	err := filepath.Walk(dpath, w)
+	return data, err
+}
+*/
+func loadDataFromFolder(dpath string) ([]TickData, error) {
+	data := make([]TickData, 0)
+	var w filepath.WalkFunc
+	jobs := make(chan string, 100)
+	results := make(chan int, 100)
+	mapData := make(map[string]*[]TickData)
+
+	for w := 0; w < runtime.NumCPU(); w++ {
+		go func(fpath <-chan string, result chan<- int) {
+			for fp := range fpath {
+				ticks := new([]TickData)
+				readMsgpackFile(fp, ticks)
+				if len(*ticks) > 0 {
+					mapData[fp] = ticks
+				}
+				result <- len(*ticks)
+			}
+		}(jobs, results)
+	}
+
+	files := make([]string, 0)
+	w = func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		files = append(files, path)
+		jobs <- path
+		return nil
+	}
+	err := filepath.Walk(dpath, w)
+	close(jobs)
+	for a := 0; a < len(files); a++ {
+		<-results
+	}
+
+	for _, fp := range files {
+		if val, ok := mapData[fp]; ok {
+			data = append(data, *val...)
+		}
+	}
+
 	return data, err
 }
 
