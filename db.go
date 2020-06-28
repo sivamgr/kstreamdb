@@ -10,6 +10,7 @@ import (
 	"path"
 	"path/filepath"
 	"runtime"
+	"sync"
 	"time"
 
 	msgpack "github.com/vmihailenco/msgpack/v4"
@@ -229,6 +230,7 @@ func loadDataFromFolder(dpath string) ([]TickData, error) {
 	jobs := make(chan string, 100)
 	results := make(chan int, 100)
 	mapData := make(map[string]*[]TickData)
+	mutex := &sync.Mutex{}
 
 	for w := 0; w < runtime.NumCPU(); w++ {
 		go func(fpath <-chan string, result chan<- int) {
@@ -236,7 +238,9 @@ func loadDataFromFolder(dpath string) ([]TickData, error) {
 				ticks := new([]TickData)
 				readMsgpackFile(fp, ticks)
 				if len(*ticks) > 0 {
+					mutex.Lock()
 					mapData[fp] = ticks
+					mutex.Unlock()
 				}
 				result <- len(*ticks)
 			}
