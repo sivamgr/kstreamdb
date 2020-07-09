@@ -187,6 +187,48 @@ func (r *DB) GetDates() ([]time.Time, error) {
 	return dates, nil
 }
 
+//compressFolder compresses all files in a folder into a single file
+func (r *DB) compressFolder(dpath string) {
+	filesByMinute := make(map[string][]string)
+	keys := make([]string, 0)
+	var w filepath.WalkFunc
+	w = func(path string, info os.FileInfo, err error) error {
+		if (err == nil) && (!info.IsDir()) {
+			key := info.Name()[0:4]
+			if _, ok := filesByMinute[key]; !ok {
+				filesByMinute[key] = make([]string, 0)
+				keys = append(keys, key)
+			}
+			filesByMinute[key] = append(filesByMinute[key], path)
+		}
+		return err
+	}
+	filepath.Walk(dpath, w)
+	for _, key := range keys {
+		if len(filesByMinute[key]) > 1 {
+			data := loadDataFromFilesList(filesByMinute[key])
+			for _, fName := range filesByMinute[key] {
+				os.Remove(fName)
+			}
+			r.Insert(data)
+		}
+
+	}
+}
+
+//Compress function compresses data from each date into a single file
+func (r *DB) Compress() {
+	files, err := ioutil.ReadDir(r.DataPath)
+	if err == nil {
+		for _, f := range files {
+			if f.IsDir() {
+				dayPath := path.Join(r.DataPath, f.Name())
+				r.compressFolder(dayPath)
+			}
+		}
+	}
+}
+
 //PlaybackFunc callback
 type PlaybackFunc func(TickData)
 
@@ -207,27 +249,15 @@ func playbackFolder(dpath string, fn PlaybackFunc) error {
 	return filepath.Walk(dpath, w)
 }
 
-func loadDataFromFolder(dpath string) ([]TickData, error) {
+func loadDataFromFilesList(files []string) []TickData {
 	data := make([]TickData, 0)
-	files := make([]string, 0)
-	
-	err := filepath.Walk(dpath, func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			return err
-		}
-		if(!info.IsDir()) {
-			files = append(files, path)
-		}
-		return nil
-	})
-
 	maxworkers := runtime.NumCPU()
 	jobs := make(chan string, maxworkers)
 	results := make(chan int, 1)
 	mapData := make(map[string]*[]TickData)
 	mutex := &sync.Mutex{}
-	
-	for w := 0; w < maxworkers ; w++ {
+
+	for w := 0; w < maxworkers; w++ {
 		go func(fpath <-chan string, result chan<- int) {
 			for fp := range fpath {
 				ticks := new([]TickData)
@@ -244,8 +274,8 @@ func loadDataFromFolder(dpath string) ([]TickData, error) {
 
 	i := 0
 	processed := 0
-	for ;processed < len(files); {
-		if(i < len(files)) && (len(jobs) < cap(jobs)) {
+	for processed < len(files) {
+		if (i < len(files)) && (len(jobs) < cap(jobs)) {
 			jobs <- files[i]
 			i++
 			continue
@@ -261,6 +291,23 @@ func loadDataFromFolder(dpath string) ([]TickData, error) {
 			data = append(data, *val...)
 		}
 	}
+	return data
+}
+
+func loadDataFromFolder(dpath string) ([]TickData, error) {
+	files := make([]string, 0)
+
+	err := filepath.Walk(dpath, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		if !info.IsDir() {
+			files = append(files, path)
+		}
+		return nil
+	})
+
+	data := loadDataFromFilesList(files)
 	return data, err
 }
 
