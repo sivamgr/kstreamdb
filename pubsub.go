@@ -3,6 +3,7 @@ package kstreamdb
 import (
 	"go.nanomsg.org/mangos/v3"
 	"go.nanomsg.org/mangos/v3/protocol/pub"
+	"go.nanomsg.org/mangos/v3/protocol/sub"
 
 	"github.com/cskr/pubsub"
 	// register transports
@@ -44,7 +45,7 @@ func ConnectToStream(url string) (Socket, error) {
 	}
 
 	var err error
-	if s.Sock, err = pub.NewSocket(); err != nil {
+	if s.Sock, err = sub.NewSocket(); err != nil {
 		return s, err
 	}
 	if err := s.Sock.Dial(url); err != nil {
