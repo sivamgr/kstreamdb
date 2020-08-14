@@ -66,7 +66,7 @@ func (s *Socket) handleStream() {
 			break
 		}
 		var tick TickData
-		err = decodeTicksFromBytes(msg, tick, false)
+		err = decodeTicksFromBytes(msg, &tick, false)
 		s.InProcPubSub.Pub(tick, "tick")
 	}
 }
